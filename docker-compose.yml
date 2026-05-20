@@ -1,0 +1,58 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:12-alpine
+    container_name: lalurecf-postgres
+    environment:
+      POSTGRES_DB: ecf_db
+      POSTGRES_USER: ecf_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecf_password_dev}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=pt_BR.UTF-8"
+      TZ: America/Sao_Paulo
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db:/docker-entrypoint-initdb.d
+    networks:
+      - ecf-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecf_user -d ecf_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: lalurecf-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ecf_db
+      SPRING_DATASOURCE_USERNAME: ecf_user
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-ecf_password_dev}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production-minimum-256-bits}
+      TZ: America/Sao_Paulo
+    ports:
+      - "8080:8081"
+    volumes:
+      - app_storage:/app/storage
+    networks:
+      - ecf-network
+    restart: unless-stopped
+
+networks:
+  ecf-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  app_storage:
+    driver: local
