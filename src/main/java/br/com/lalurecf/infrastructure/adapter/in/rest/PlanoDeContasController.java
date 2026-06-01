@@ -111,7 +111,7 @@ public class PlanoDeContasController {
     Long companyId = CompanyContext.getCurrentCompanyId();
     if (companyId == null) {
       throw new IllegalArgumentException(
-          "Company context is required (header X-Company-Id missing)");
+          "É necessário selecionar uma empresa");
     }
 
     // Obter ano fiscal do contexto (header X-Fiscal-Year)

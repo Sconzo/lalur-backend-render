@@ -81,7 +81,7 @@ public class LancamentoParteBService
     Long companyId = CompanyContext.getCurrentCompanyId();
     if (companyId == null) {
       throw new IllegalArgumentException(
-          "Company context is required (header X-Company-Id missing)");
+          "É necessário selecionar uma empresa");
     }
 
     // Validar parâmetro tributário (obrigatório, deve existir e estar ACTIVE)
@@ -143,7 +143,7 @@ public class LancamentoParteBService
     Long companyId = CompanyContext.getCurrentCompanyId();
     if (companyId == null) {
       throw new IllegalArgumentException(
-          "Company context is required (header X-Company-Id missing)");
+          "É necessário selecionar uma empresa");
     }
 
     log.info("Listing LancamentosParteB for company: {}", companyId);
@@ -256,7 +256,7 @@ public class LancamentoParteBService
     Long companyId = CompanyContext.getCurrentCompanyId();
     if (companyId == null) {
       throw new IllegalArgumentException(
-          "Company context is required (header X-Company-Id missing)");
+          "É necessário selecionar uma empresa");
     }
 
     // Validar parâmetro tributário (obrigatório, deve existir e estar ACTIVE)

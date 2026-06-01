@@ -240,7 +240,7 @@ class ContaParteBControllerTest extends IntegrationTestBase {
         .andExpect(status().isBadRequest())
         .andExpect(
             jsonPath("$.message")
-                .value("Company context is required (header X-Company-Id missing)"));
+                .value("É necessário selecionar uma empresa"));
   }
 
   @Test

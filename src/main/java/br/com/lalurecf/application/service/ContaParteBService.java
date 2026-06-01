@@ -54,7 +54,7 @@ public class ContaParteBService
     Long companyId = CompanyContext.getCurrentCompanyId();
     if (companyId == null) {
       throw new IllegalArgumentException(
-          "Company context is required (header X-Company-Id missing)");
+          "É necessário selecionar uma empresa");
     }
 
     // Validar dataVigenciaFim >= dataVigenciaInicio
@@ -108,7 +108,7 @@ public class ContaParteBService
     Long companyId = CompanyContext.getCurrentCompanyId();
     if (companyId == null) {
       throw new IllegalArgumentException(
-          "Company context is required (header X-Company-Id missing)");
+          "É necessário selecionar uma empresa");
     }
 
     log.info("Listing ContasParteB for company: {}, anoBase: {}", companyId, anoBase);

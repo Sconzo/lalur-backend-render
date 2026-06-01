@@ -67,7 +67,7 @@ public class PlanoDeContasService
     Long companyId = CompanyContext.getCurrentCompanyId();
     if (companyId == null) {
       throw new IllegalArgumentException(
-          "Company context is required (header X-Company-Id missing)");
+          "É necessário selecionar uma empresa");
     }
 
     // Obter ano fiscal do contexto (header X-Fiscal-Year)
@@ -164,7 +164,7 @@ public class PlanoDeContasService
     Long companyId = CompanyContext.getCurrentCompanyId();
     if (companyId == null) {
       throw new IllegalArgumentException(
-          "Company context is required (header X-Company-Id missing)");
+          "É necessário selecionar uma empresa");
     }
 
     log.info(
@@ -223,7 +223,7 @@ public class PlanoDeContasService
     Long companyId = CompanyContext.getCurrentCompanyId();
     if (companyId == null) {
       throw new IllegalArgumentException(
-          "Company context is required (header X-Company-Id missing)");
+          "É necessário selecionar uma empresa");
     }
 
     log.info("Getting PlanoDeContas with id: {}", id);
@@ -259,7 +259,7 @@ public class PlanoDeContasService
     Long companyId = CompanyContext.getCurrentCompanyId();
     if (companyId == null) {
       throw new IllegalArgumentException(
-          "Company context is required (header X-Company-Id missing)");
+          "É necessário selecionar uma empresa");
     }
 
     log.info("Updating PlanoDeContas with id: {}", id);
@@ -316,7 +316,7 @@ public class PlanoDeContasService
     Long companyId = CompanyContext.getCurrentCompanyId();
     if (companyId == null) {
       throw new IllegalArgumentException(
-          "Company context is required (header X-Company-Id missing)");
+          "É necessário selecionar uma empresa");
     }
 
     log.info("Toggling status of PlanoDeContas with id: {} to {}", id, request.getStatus());
