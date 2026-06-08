@@ -442,13 +442,13 @@ public class CompanyController {
    *
    * <p>Regras: se o Período Contábil é {@code 31/12/Y}, retorna {@code [Y+1, ..., anoAtual]};
    * caso contrário, sendo {@code X} o ano do Período Contábil, retorna
-   * {@code [X, X+1, ..., anoAtual]}. Apenas ADMIN pode acessar.
+   * {@code [X, X+1, ..., anoAtual]}. Acessível para ADMIN e CONTADOR.
    *
    * @param id ID da empresa
    * @return lista de anos em ordem ascendente
    */
   @GetMapping("/{id}/year-select")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'CONTADOR')")
   public ResponseEntity<List<Integer>> getYearSelect(@PathVariable Long id) {
     log.info("GET /companies/{}/year-select - Listando anos selecionáveis", id);
     List<Integer> years = getCompanyYearSelectUseCase.getYearSelect(id);
