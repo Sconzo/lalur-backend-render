@@ -58,13 +58,16 @@ public interface TaxParameterJpaRepository
   List<String> findDistinctTipos();
 
   /**
-   * Busca todos os parâmetros tributários ordenados por tipo e descrição. Útil para agrupar
-   * parâmetros por tipo.
+   * Busca parâmetros tributários ACTIVE (com tipo também ACTIVE), ordenados por tipo e descrição.
+   * Útil para agrupar parâmetros por tipo em telas de seleção (ex.: criação/edição de empresa),
+   * onde itens inativados pelo usuário não devem aparecer.
    *
-   * @return lista de parâmetros ordenados
+   * @return lista de parâmetros ativos ordenados
    */
   @Query(
-      "SELECT t FROM TaxParameterEntity t JOIN FETCH t.tipoParametro ORDER BY"
-          + " t.tipoParametro.descricao, t.descricao")
+      "SELECT t FROM TaxParameterEntity t JOIN FETCH t.tipoParametro tp"
+          + " WHERE t.status = br.com.lalurecf.domain.enums.Status.ACTIVE"
+          + " AND tp.status = br.com.lalurecf.domain.enums.Status.ACTIVE"
+          + " ORDER BY tp.descricao, t.descricao")
   List<TaxParameterEntity> findTaxParametersOrderByType();
 }
