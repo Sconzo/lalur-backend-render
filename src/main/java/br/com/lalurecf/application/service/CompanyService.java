@@ -5,6 +5,7 @@ import br.com.lalurecf.application.port.in.company.CreateTemporalValueUseCase;
 import br.com.lalurecf.application.port.in.company.DeleteTemporalValueUseCase;
 import br.com.lalurecf.application.port.in.company.GetCompanyTaxParametersTimelineUseCase;
 import br.com.lalurecf.application.port.in.company.GetCompanyUseCase;
+import br.com.lalurecf.application.port.in.company.GetCompanyYearSelectUseCase;
 import br.com.lalurecf.application.port.in.company.GetPeriodoContabilAuditUseCase;
 import br.com.lalurecf.application.port.in.company.ListCompaniesUseCase;
 import br.com.lalurecf.application.port.in.company.ListCompanyTaxParametersUseCase;
@@ -91,7 +92,8 @@ public class CompanyService implements
     CreateTemporalValueUseCase,
     ListTemporalValuesUseCase,
     DeleteTemporalValueUseCase,
-    GetCompanyTaxParametersTimelineUseCase {
+    GetCompanyTaxParametersTimelineUseCase,
+    GetCompanyYearSelectUseCase {
 
   private final CompanyJpaRepository companyRepository;
   private final TaxParameterJpaRepository taxParameterRepository;
@@ -654,6 +656,35 @@ public class CompanyService implements
             audit.getChangedAt()
         ))
         .collect(Collectors.toList());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<Integer> getYearSelect(Long companyId) {
+    log.info("Listando anos selecionáveis para empresa ID: {}", companyId);
+
+    CompanyEntity company = companyRepository.findById(companyId)
+        .orElseThrow(() -> new EntityNotFoundException(
+            "Empresa não encontrada com ID: " + companyId));
+
+    LocalDate periodoContabil = company.getPeriodoContabil();
+    int currentYear = LocalDate.now().getYear();
+    int startYear = periodoContabil.getYear();
+
+    // Se Período Contábil é 31/12/Y, anos elegíveis começam em Y+1 (Y é excluído).
+    if (periodoContabil.getMonthValue() == 12 && periodoContabil.getDayOfMonth() == 31) {
+      startYear++;
+    }
+
+    if (startYear > currentYear) {
+      return List.of();
+    }
+
+    List<Integer> years = new ArrayList<>(currentYear - startYear + 1);
+    for (int y = startYear; y <= currentYear; y++) {
+      years.add(y);
+    }
+    return years;
   }
 
   /**

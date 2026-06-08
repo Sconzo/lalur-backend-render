@@ -5,6 +5,7 @@ import br.com.lalurecf.application.port.in.company.CreateTemporalValueUseCase;
 import br.com.lalurecf.application.port.in.company.DeleteTemporalValueUseCase;
 import br.com.lalurecf.application.port.in.company.GetCompanyTaxParametersTimelineUseCase;
 import br.com.lalurecf.application.port.in.company.GetCompanyUseCase;
+import br.com.lalurecf.application.port.in.company.GetCompanyYearSelectUseCase;
 import br.com.lalurecf.application.port.in.company.ListCompaniesUseCase;
 import br.com.lalurecf.application.port.in.company.ListCompanyTaxParametersUseCase;
 import br.com.lalurecf.application.port.in.company.ListTemporalValuesUseCase;
@@ -98,6 +99,7 @@ public class CompanyController {
   private final ListTemporalValuesUseCase listTemporalValuesUseCase;
   private final DeleteTemporalValueUseCase deleteTemporalValueUseCase;
   private final GetCompanyTaxParametersTimelineUseCase getCompanyTaxParametersTimelineUseCase;
+  private final GetCompanyYearSelectUseCase getCompanyYearSelectUseCase;
 
   /**
    * Cria uma nova empresa.
@@ -433,6 +435,24 @@ public class CompanyController {
     List<PeriodoContabilAuditResponse> response =
         getPeriodoContabilAuditUseCase.getAuditHistory(id);
     return ResponseEntity.ok(response);
+  }
+
+  /**
+   * Lista anos selecionáveis para uma empresa, derivados do seu Período Contábil.
+   *
+   * <p>Regras: se o Período Contábil é {@code 31/12/Y}, retorna {@code [Y+1, ..., anoAtual]};
+   * caso contrário, sendo {@code X} o ano do Período Contábil, retorna
+   * {@code [X, X+1, ..., anoAtual]}. Apenas ADMIN pode acessar.
+   *
+   * @param id ID da empresa
+   * @return lista de anos em ordem ascendente
+   */
+  @GetMapping("/{id}/year-select")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<List<Integer>> getYearSelect(@PathVariable Long id) {
+    log.info("GET /companies/{}/year-select - Listando anos selecionáveis", id);
+    List<Integer> years = getCompanyYearSelectUseCase.getYearSelect(id);
+    return ResponseEntity.ok(years);
   }
 
   /**
