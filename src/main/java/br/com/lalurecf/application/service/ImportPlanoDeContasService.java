@@ -3,6 +3,7 @@ package br.com.lalurecf.application.service;
 import br.com.lalurecf.application.port.in.planodecontas.ImportPlanoDeContasUseCase;
 import br.com.lalurecf.application.port.out.ContaReferencialRepositoryPort;
 import br.com.lalurecf.application.port.out.PlanoDeContasRepositoryPort;
+import br.com.lalurecf.application.util.CsvCharsetUtils;
 import br.com.lalurecf.domain.enums.AccountType;
 import br.com.lalurecf.domain.enums.ClasseContabil;
 import br.com.lalurecf.domain.enums.NaturezaConta;
@@ -14,10 +15,6 @@ import br.com.lalurecf.infrastructure.dto.planodecontas.ImportPlanoDeContasRespo
 import br.com.lalurecf.infrastructure.dto.planodecontas.ImportPlanoDeContasResponse.ImportError;
 import br.com.lalurecf.infrastructure.dto.planodecontas.ImportPlanoDeContasResponse.PlanoDeContasPreview;
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -90,28 +87,14 @@ public class ImportPlanoDeContasService implements ImportPlanoDeContasUseCase {
             .collect(Collectors.toMap(ContaReferencial::getCodigoRfb, Function.identity(),
                 (a, b) -> a));
 
-    // Detectar e remover BOM; se presente, usar UTF-8
     byte[] rawBytes;
     try {
       rawBytes = file.getBytes();
     } catch (Exception e) {
       throw new RuntimeException("Error reading file: " + e.getMessage(), e);
     }
-    int bomOffset = 0;
-    Charset charset = StandardCharsets.ISO_8859_1;
-    if (rawBytes.length >= 3
-        && (rawBytes[0] & 0xFF) == 0xEF
-        && (rawBytes[1] & 0xFF) == 0xBB
-        && (rawBytes[2] & 0xFF) == 0xBF) {
-      bomOffset = 3;
-      charset = StandardCharsets.UTF_8;
-    }
 
-    try (BufferedReader reader =
-            new BufferedReader(
-                new InputStreamReader(
-                    new ByteArrayInputStream(rawBytes, bomOffset, rawBytes.length - bomOffset),
-                    charset));
+    try (BufferedReader reader = CsvCharsetUtils.newReader(rawBytes);
         CSVParser csvParser = createCsvParser(reader, file)) {
 
       for (CSVRecord record : csvParser) {
