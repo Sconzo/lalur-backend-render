@@ -61,7 +61,7 @@ public class ArquivoParcialAssemblerService implements GenerateArquivoParcialUse
     }
 
     // Passo 2: gerar conteúdo do bloco M reutilizando a lista já carregada
-    String content = partMGeneratorService.generateArquivoParcial(active, fiscalYear);
+    String content = partMGeneratorService.generateArquivoParcial(active, fiscalYear, companyId);
 
     // Passo 3: montar EcfFile
     Company company = companyRepositoryPort.findById(companyId)

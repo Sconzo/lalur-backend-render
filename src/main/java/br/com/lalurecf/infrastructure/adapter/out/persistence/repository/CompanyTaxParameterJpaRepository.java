@@ -59,4 +59,22 @@ public interface CompanyTaxParameterJpaRepository
       @Param("companyId") Long companyId,
       @Param("taxParameterId") Long taxParameterId
   );
+
+  /**
+   * Busca o código do parâmetro tributário ACTIVE associado à empresa para um determinado tipo
+   * (identificado pela descrição do tipo). Útil para resolver parâmetros GLOBAL como
+   * {@code PERIODO_DE_APURACAO} (códigos {@code A}/{@code T}).
+   *
+   * @param companyId ID da empresa
+   * @param typeDescription descrição do tipo de parâmetro (ex.: {@code PERIODO_DE_APURACAO})
+   * @return código do parâmetro ACTIVE, ou empty se a empresa não tem o tipo associado
+   */
+  @Query("SELECT tp.codigo FROM CompanyTaxParameterEntity ctp, TaxParameterEntity tp"
+      + " WHERE ctp.taxParameterId = tp.id"
+      + " AND ctp.companyId = :companyId"
+      + " AND tp.tipoParametro.descricao = :typeDescription"
+      + " AND tp.status = br.com.lalurecf.domain.enums.Status.ACTIVE")
+  Optional<String> findActiveParameterCodeByCompanyAndTypeDescription(
+      @Param("companyId") Long companyId,
+      @Param("typeDescription") String typeDescription);
 }

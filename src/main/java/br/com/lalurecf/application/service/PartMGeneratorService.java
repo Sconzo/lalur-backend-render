@@ -12,6 +12,7 @@ import br.com.lalurecf.domain.model.ContaParteB;
 import br.com.lalurecf.domain.model.LancamentoParteB;
 import br.com.lalurecf.domain.model.PlanoDeContas;
 import br.com.lalurecf.domain.model.TaxParameter;
+import br.com.lalurecf.infrastructure.adapter.out.persistence.repository.CompanyTaxParameterJpaRepository;
 import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.LocalDate;
@@ -44,10 +45,20 @@ public class PartMGeneratorService {
 
   private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("ddMMyyyy");
 
+  /** Descrição do tipo de parâmetro tributário usado para determinar Anual vs Trimestral. */
+  private static final String PERIODO_DE_APURACAO_TYPE = "PERIODO_DE_APURACAO";
+
+  /** Código do parâmetro PERIODO_DE_APURACAO indicando apuração anual com estimativa mensal. */
+  private static final String PERIODO_ANUAL = "A";
+
+  /** Código do parâmetro PERIODO_DE_APURACAO indicando apuração trimestral. */
+  private static final String PERIODO_TRIMESTRAL = "T";
+
   private final LancamentoParteBRepositoryPort lancamentoRepo;
   private final ContaParteBRepositoryPort contaParteBRepo;
   private final PlanoDeContasRepositoryPort planoDeContasRepo;
   private final TaxParameterRepositoryPort taxParameterRepo;
+  private final CompanyTaxParameterJpaRepository companyTaxParameterRepository;
 
   /**
    * Gera o conteúdo do bloco M para o arquivo parcial ECF.
@@ -66,22 +77,26 @@ public class PartMGeneratorService {
     List<LancamentoParteB> active =
         lancamentoRepo.findByCompanyIdAndAnoReferenciaAndStatus(
             companyId, fiscalYear, Status.ACTIVE);
-    return generateArquivoParcial(active, fiscalYear);
+    return generateArquivoParcial(active, fiscalYear, companyId);
   }
 
   /**
    * Variante que recebe a lista já filtrada, evitando nova consulta ao banco quando o chamador
-   * já carregou os lançamentos.
+   * já carregou os lançamentos. O {@code companyId} é necessário para resolver o
+   * {@code PERIODO_DE_APURACAO} da empresa (Anual vs Trimestral).
    */
-  public String generateArquivoParcial(List<LancamentoParteB> active, Integer fiscalYear) {
+  public String generateArquivoParcial(
+      List<LancamentoParteB> active, Integer fiscalYear, Long companyId) {
     if (active.isEmpty()) {
       throw new IllegalArgumentException(
           "Nenhum lançamento da Parte B ativo encontrado para o ano " + fiscalYear);
     }
 
+    String periodoApuracaoCode = lookupPeriodoApuracao(companyId);
+
     List<String> lines = new ArrayList<>();
-    lines.addAll(generateGrupoIrpj(active, fiscalYear));
-    lines.addAll(generateGrupoCsll(active, fiscalYear));
+    lines.addAll(generateGrupoIrpj(active, fiscalYear, periodoApuracaoCode));
+    lines.addAll(generateGrupoCsll(active, fiscalYear, periodoApuracaoCode));
 
     lines.add(String.format("|M990|%d|", lines.size() + 1));
 
@@ -92,20 +107,45 @@ public class PartMGeneratorService {
    * Gera linhas do Grupo 1 — IRPJ (M030/M300/M305/M310).
    * Package-private para facilitar testes unitários.
    */
-  List<String> generateGrupoIrpj(List<LancamentoParteB> active, Integer fiscalYear) {
-    return generateGrupo(active, fiscalYear, TipoApuracao.IRPJ, "M300", "M305", "M310");
+  List<String> generateGrupoIrpj(
+      List<LancamentoParteB> active, Integer fiscalYear, String periodoApuracaoCode) {
+    return generateGrupo(
+        active, fiscalYear, periodoApuracaoCode, TipoApuracao.IRPJ, "M300", "M305", "M310");
   }
 
   /**
    * Gera linhas do Grupo 2 — CSLL (M030/M350/M355/M360).
    * Package-private para facilitar testes unitários.
    */
-  List<String> generateGrupoCsll(List<LancamentoParteB> active, Integer fiscalYear) {
-    return generateGrupo(active, fiscalYear, TipoApuracao.CSLL, "M350", "M355", "M360");
+  List<String> generateGrupoCsll(
+      List<LancamentoParteB> active, Integer fiscalYear, String periodoApuracaoCode) {
+    return generateGrupo(
+        active, fiscalYear, periodoApuracaoCode, TipoApuracao.CSLL, "M350", "M355", "M360");
+  }
+
+  /**
+   * Resolve o código do {@code PERIODO_DE_APURACAO} configurado para a empresa.
+   *
+   * @return {@code "A"} (Anual) ou {@code "T"} (Trimestral)
+   * @throws IllegalStateException se a empresa não tem o parâmetro associado ou o código é
+   *     inválido
+   */
+  private String lookupPeriodoApuracao(Long companyId) {
+    String code = companyTaxParameterRepository
+        .findActiveParameterCodeByCompanyAndTypeDescription(companyId, PERIODO_DE_APURACAO_TYPE)
+        .orElseThrow(() -> new IllegalStateException(
+            "Empresa " + companyId + " não possui parâmetro " + PERIODO_DE_APURACAO_TYPE
+                + " associado"));
+    if (!PERIODO_ANUAL.equals(code) && !PERIODO_TRIMESTRAL.equals(code)) {
+      throw new IllegalStateException(
+          PERIODO_DE_APURACAO_TYPE + " da empresa " + companyId + " tem código inválido: "
+              + code + " (esperado " + PERIODO_ANUAL + " ou " + PERIODO_TRIMESTRAL + ")");
+    }
+    return code;
   }
 
   private List<String> generateGrupo(
-      List<LancamentoParteB> allActive, Integer fiscalYear,
+      List<LancamentoParteB> allActive, Integer fiscalYear, String periodoApuracaoCode,
       TipoApuracao tipoApuracao, String regPai, String regFilhoParteB, String regFilhoContabil) {
 
     List<LancamentoParteB> filtered = allActive.stream()
@@ -121,29 +161,48 @@ public class PartMGeneratorService {
     Map<Long, ContaParteB> contasParteBById = batchFetchContasParteB(filtered);
     Map<Long, PlanoDeContas> contasContabeisById = batchFetchPlanoDeContas(filtered);
 
-    // Período cumulativo desde 01/01 do ano fiscal
+    boolean trimestral = PERIODO_TRIMESTRAL.equals(periodoApuracaoCode);
+
+    // Anual: período cumulativo desde 01/01 (M030 mensal de A01..A12).
+    // Trimestral: cada trimestre é independente (M030 T01..T04).
     LocalDate inicioAno = LocalDate.of(fiscalYear, 1, 1);
 
-    // Agrupar por mesReferencia (ordenado)
-    Map<Integer, List<LancamentoParteB>> byMes = new TreeMap<>(
-        filtered.stream().collect(Collectors.groupingBy(LancamentoParteB::getMesReferencia)));
+    // Agrupa por mês (1-12) no Anual, ou por trimestre (1-4) no Trimestral
+    Map<Integer, List<LancamentoParteB>> byPeriodo = new TreeMap<>(
+        filtered.stream().collect(Collectors.groupingBy(
+            l -> trimestral
+                ? (l.getMesReferencia() - 1) / 3 + 1
+                : l.getMesReferencia())));
 
     List<String> lines = new ArrayList<>();
 
-    for (Map.Entry<Integer, List<LancamentoParteB>> mesEntry : byMes.entrySet()) {
-      int mes = mesEntry.getKey();
-      List<LancamentoParteB> lancamentosMes = mesEntry.getValue();
+    for (Map.Entry<Integer, List<LancamentoParteB>> periodoEntry : byPeriodo.entrySet()) {
+      int periodo = periodoEntry.getKey();
+      List<LancamentoParteB> lancamentosPeriodo = periodoEntry.getValue();
 
-      // M030 — sempre 01/01 a último dia do mês corrente
-      LocalDate fim = LocalDate.of(fiscalYear, mes, 1)
-          .withDayOfMonth(LocalDate.of(fiscalYear, mes, 1).lengthOfMonth());
-      String codigoApuracao = "A" + String.format("%02d", mes);
+      // M030: data inicial / final / código de apuração variam por modo
+      LocalDate inicio;
+      LocalDate fim;
+      String codigoApuracao;
+      if (trimestral) {
+        int primeiroMes = (periodo - 1) * 3 + 1;
+        int ultimoMes = periodo * 3;
+        inicio = LocalDate.of(fiscalYear, primeiroMes, 1);
+        fim = LocalDate.of(fiscalYear, ultimoMes, 1)
+            .withDayOfMonth(LocalDate.of(fiscalYear, ultimoMes, 1).lengthOfMonth());
+        codigoApuracao = "T" + String.format("%02d", periodo);
+      } else {
+        inicio = inicioAno;
+        fim = LocalDate.of(fiscalYear, periodo, 1)
+            .withDayOfMonth(LocalDate.of(fiscalYear, periodo, 1).lengthOfMonth());
+        codigoApuracao = "A" + String.format("%02d", periodo);
+      }
       lines.add(String.format("|M030|%s|%s|%s|",
-          inicioAno.format(DATE_FORMAT), fim.format(DATE_FORMAT), codigoApuracao));
+          inicio.format(DATE_FORMAT), fim.format(DATE_FORMAT), codigoApuracao));
 
       // Agrupar por parametroTributarioId, ordenado pelo code (numérico crescente)
       // para seguir o padrão do ECF (ex: 6 → 8 → 8.65 → 8.75 → 95)
-      Map<Long, List<LancamentoParteB>> byParametro = lancamentosMes.stream()
+      Map<Long, List<LancamentoParteB>> byParametro = lancamentosPeriodo.stream()
           .collect(Collectors.groupingBy(
               LancamentoParteB::getParametroTributarioId,
               LinkedHashMap::new,

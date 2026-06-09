@@ -9,6 +9,7 @@ import br.com.lalurecf.application.port.out.LancamentoParteBRepositoryPort;
 import br.com.lalurecf.application.port.out.PlanoDeContasRepositoryPort;
 import br.com.lalurecf.application.port.out.TaxParameterRepositoryPort;
 import br.com.lalurecf.domain.enums.Status;
+import br.com.lalurecf.infrastructure.adapter.out.persistence.repository.CompanyTaxParameterJpaRepository;
 import br.com.lalurecf.domain.enums.TipoAjuste;
 import br.com.lalurecf.domain.enums.TipoApuracao;
 import br.com.lalurecf.domain.enums.TipoRelacionamento;
@@ -51,6 +52,9 @@ class PartMGeneratorServiceTest {
   @Mock
   private TaxParameterRepositoryPort taxParameterRepo;
 
+  @Mock
+  private CompanyTaxParameterJpaRepository companyTaxParameterRepository;
+
   @InjectMocks
   private PartMGeneratorService service;
 
@@ -91,10 +95,10 @@ class PartMGeneratorServiceTest {
   void generateGrupoIrpj_deveGerarM030ComDatasCorretas() {
     LancamentoParteB lanc = lancamentoIrpj(1, TipoRelacionamento.CONTA_CONTABIL, TipoAjuste.ADICAO,
         BigDecimal.valueOf(500));
-    when(taxParameterRepo.findById(PARAMETRO_ID)).thenReturn(Optional.of(parametro));
-    when(planoDeContasRepo.findById(CONTA_CONTABIL_ID)).thenReturn(Optional.of(planoDeContas));
+    when(taxParameterRepo.findAllById(List.of(PARAMETRO_ID))).thenReturn(List.of(parametro));
+    when(planoDeContasRepo.findAllById(List.of(CONTA_CONTABIL_ID))).thenReturn(List.of(planoDeContas));
 
-    List<String> lines = service.generateGrupoIrpj(List.of(lanc), FISCAL_YEAR);
+    List<String> lines = service.generateGrupoIrpj(List.of(lanc), FISCAL_YEAR, "A");
 
     assertThat(lines).isNotEmpty();
     assertThat(lines.get(0)).isEqualTo("|M030|01012024|31012024|A01|");
@@ -107,11 +111,11 @@ class PartMGeneratorServiceTest {
         TipoAjuste.ADICAO, BigDecimal.valueOf(300));
     LancamentoParteB exclusao = lancamentoIrpj(2, TipoRelacionamento.CONTA_CONTABIL,
         TipoAjuste.EXCLUSAO, BigDecimal.valueOf(200));
-    when(taxParameterRepo.findById(PARAMETRO_ID)).thenReturn(Optional.of(parametro));
-    when(planoDeContasRepo.findById(CONTA_CONTABIL_ID)).thenReturn(Optional.of(planoDeContas));
+    when(taxParameterRepo.findAllById(List.of(PARAMETRO_ID))).thenReturn(List.of(parametro));
+    when(planoDeContasRepo.findAllById(List.of(CONTA_CONTABIL_ID))).thenReturn(List.of(planoDeContas));
 
-    List<String> adicaoLines = service.generateGrupoIrpj(List.of(adicao), FISCAL_YEAR);
-    List<String> exclusaoLines = service.generateGrupoIrpj(List.of(exclusao), FISCAL_YEAR);
+    List<String> adicaoLines = service.generateGrupoIrpj(List.of(adicao), FISCAL_YEAR, "A");
+    List<String> exclusaoLines = service.generateGrupoIrpj(List.of(exclusao), FISCAL_YEAR, "A");
 
     // Mes 1 ADICAO: M030, M300 com A, M310 com D
     String m300Adicao = adicaoLines.get(1);
@@ -130,11 +134,11 @@ class PartMGeneratorServiceTest {
   @DisplayName("tipoRelacionamento = AMBOS gera tanto M305 quanto M310")
   void generateGrupoIrpj_ambosGeraM305eM310() {
     LancamentoParteB lanc = lancamentoIrpjAmbos(1, TipoAjuste.ADICAO, BigDecimal.valueOf(100));
-    when(taxParameterRepo.findById(PARAMETRO_ID)).thenReturn(Optional.of(parametro));
-    when(contaParteBRepo.findById(CONTA_PARTE_B_ID)).thenReturn(Optional.of(contaParteB));
-    when(planoDeContasRepo.findById(CONTA_CONTABIL_ID)).thenReturn(Optional.of(planoDeContas));
+    when(taxParameterRepo.findAllById(List.of(PARAMETRO_ID))).thenReturn(List.of(parametro));
+    when(contaParteBRepo.findAllById(List.of(CONTA_PARTE_B_ID))).thenReturn(List.of(contaParteB));
+    when(planoDeContasRepo.findAllById(List.of(CONTA_CONTABIL_ID))).thenReturn(List.of(planoDeContas));
 
-    List<String> lines = service.generateGrupoIrpj(List.of(lanc), FISCAL_YEAR);
+    List<String> lines = service.generateGrupoIrpj(List.of(lanc), FISCAL_YEAR, "A");
 
     // M030, M300, M305, M310 = 4 linhas
     assertThat(lines).hasSize(4);
@@ -147,10 +151,10 @@ class PartMGeneratorServiceTest {
   void generateGrupoIrpj_contaContabilNaoGeraM305() {
     LancamentoParteB lanc = lancamentoIrpj(1, TipoRelacionamento.CONTA_CONTABIL,
         TipoAjuste.ADICAO, BigDecimal.valueOf(100));
-    when(taxParameterRepo.findById(PARAMETRO_ID)).thenReturn(Optional.of(parametro));
-    when(planoDeContasRepo.findById(CONTA_CONTABIL_ID)).thenReturn(Optional.of(planoDeContas));
+    when(taxParameterRepo.findAllById(List.of(PARAMETRO_ID))).thenReturn(List.of(parametro));
+    when(planoDeContasRepo.findAllById(List.of(CONTA_CONTABIL_ID))).thenReturn(List.of(planoDeContas));
 
-    List<String> lines = service.generateGrupoIrpj(List.of(lanc), FISCAL_YEAR);
+    List<String> lines = service.generateGrupoIrpj(List.of(lanc), FISCAL_YEAR, "A");
 
     assertThat(lines).noneMatch(l -> l.startsWith("|M305|"));
     assertThat(lines).anyMatch(l -> l.startsWith("|M310|"));
@@ -161,10 +165,10 @@ class PartMGeneratorServiceTest {
   void generateGrupoIrpj_contaParteBNaoGeraM310() {
     LancamentoParteB lanc = lancamentoIrpj(1, TipoRelacionamento.CONTA_PARTE_B,
         TipoAjuste.ADICAO, BigDecimal.valueOf(100));
-    when(taxParameterRepo.findById(PARAMETRO_ID)).thenReturn(Optional.of(parametro));
-    when(contaParteBRepo.findById(CONTA_PARTE_B_ID)).thenReturn(Optional.of(contaParteB));
+    when(taxParameterRepo.findAllById(List.of(PARAMETRO_ID))).thenReturn(List.of(parametro));
+    when(contaParteBRepo.findAllById(List.of(CONTA_PARTE_B_ID))).thenReturn(List.of(contaParteB));
 
-    List<String> lines = service.generateGrupoIrpj(List.of(lanc), FISCAL_YEAR);
+    List<String> lines = service.generateGrupoIrpj(List.of(lanc), FISCAL_YEAR, "A");
 
     assertThat(lines).noneMatch(l -> l.startsWith("|M310|"));
     assertThat(lines).anyMatch(l -> l.startsWith("|M305|"));
@@ -187,11 +191,11 @@ class PartMGeneratorServiceTest {
         .valor(BigDecimal.valueOf(200))
         .status(Status.ACTIVE)
         .build();
-    when(taxParameterRepo.findById(PARAMETRO_ID)).thenReturn(Optional.of(parametro));
-    when(planoDeContasRepo.findById(CONTA_CONTABIL_ID)).thenReturn(Optional.of(planoDeContas));
+    when(taxParameterRepo.findAllById(List.of(PARAMETRO_ID))).thenReturn(List.of(parametro));
+    when(planoDeContasRepo.findAllById(List.of(CONTA_CONTABIL_ID))).thenReturn(List.of(planoDeContas));
 
-    List<String> irpjLines = service.generateGrupoIrpj(List.of(irpj), FISCAL_YEAR);
-    List<String> csllLines = service.generateGrupoCsll(List.of(csll), FISCAL_YEAR);
+    List<String> irpjLines = service.generateGrupoIrpj(List.of(irpj), FISCAL_YEAR, "A");
+    List<String> csllLines = service.generateGrupoCsll(List.of(csll), FISCAL_YEAR, "A");
 
     assertThat(irpjLines).anyMatch(l -> l.startsWith("|M300|"));
     assertThat(irpjLines).anyMatch(l -> l.startsWith("|M310|"));
@@ -207,10 +211,10 @@ class PartMGeneratorServiceTest {
   void generateGrupoIrpj_formatacaoDeValorComVirgula() {
     LancamentoParteB lanc = lancamentoIrpj(1, TipoRelacionamento.CONTA_CONTABIL,
         TipoAjuste.ADICAO, new BigDecimal("1234.56"));
-    when(taxParameterRepo.findById(PARAMETRO_ID)).thenReturn(Optional.of(parametro));
-    when(planoDeContasRepo.findById(CONTA_CONTABIL_ID)).thenReturn(Optional.of(planoDeContas));
+    when(taxParameterRepo.findAllById(List.of(PARAMETRO_ID))).thenReturn(List.of(parametro));
+    when(planoDeContasRepo.findAllById(List.of(CONTA_CONTABIL_ID))).thenReturn(List.of(planoDeContas));
 
-    List<String> lines = service.generateGrupoIrpj(List.of(lanc), FISCAL_YEAR);
+    List<String> lines = service.generateGrupoIrpj(List.of(lanc), FISCAL_YEAR, "A");
 
     assertThat(lines).anyMatch(l -> l.contains("1234,56"));
     assertThat(lines).noneMatch(l -> l.contains("1234.56"));
@@ -223,47 +227,40 @@ class PartMGeneratorServiceTest {
         TipoAjuste.ADICAO, BigDecimal.valueOf(300));
     LancamentoParteB lanc2 = lancamentoIrpj(1, TipoRelacionamento.CONTA_CONTABIL,
         TipoAjuste.ADICAO, BigDecimal.valueOf(200));
-    when(taxParameterRepo.findById(PARAMETRO_ID)).thenReturn(Optional.of(parametro));
-    when(planoDeContasRepo.findById(CONTA_CONTABIL_ID)).thenReturn(Optional.of(planoDeContas));
+    when(taxParameterRepo.findAllById(List.of(PARAMETRO_ID))).thenReturn(List.of(parametro));
+    when(planoDeContasRepo.findAllById(List.of(CONTA_CONTABIL_ID))).thenReturn(List.of(planoDeContas));
 
-    List<String> lines = service.generateGrupoIrpj(List.of(lanc1, lanc2), FISCAL_YEAR);
+    List<String> lines = service.generateGrupoIrpj(List.of(lanc1, lanc2), FISCAL_YEAR, "A");
 
     String m300 = lines.stream().filter(l -> l.startsWith("|M300|")).findFirst().orElseThrow();
     assertThat(m300).contains("500,00");
   }
 
   @Test
-  @DisplayName("Lançamentos INACTIVE são ignorados")
+  @DisplayName("Service filtra por Status.ACTIVE ao consultar lançamentos (INACTIVE ignorados)")
   void generateArquivoParcial_lancamentosInativosIgnorados() {
     LancamentoParteB active = lancamentoIrpj(1, TipoRelacionamento.CONTA_CONTABIL,
         TipoAjuste.ADICAO, BigDecimal.valueOf(100));
-    LancamentoParteB inactive = LancamentoParteB.builder()
-        .mesReferencia(1)
-        .anoReferencia(FISCAL_YEAR)
-        .tipoApuracao(TipoApuracao.IRPJ)
-        .tipoRelacionamento(TipoRelacionamento.CONTA_CONTABIL)
-        .tipoAjuste(TipoAjuste.ADICAO)
-        .contaContabilId(CONTA_CONTABIL_ID)
-        .parametroTributarioId(PARAMETRO_ID)
-        .descricao("inactive")
-        .valor(BigDecimal.valueOf(999))
-        .status(Status.INACTIVE)
-        .build();
-    when(lancamentoRepo.findByCompanyIdAndAnoReferencia(COMPANY_ID, FISCAL_YEAR))
-        .thenReturn(List.of(active, inactive));
-    when(taxParameterRepo.findById(PARAMETRO_ID)).thenReturn(Optional.of(parametro));
-    when(planoDeContasRepo.findById(CONTA_CONTABIL_ID)).thenReturn(Optional.of(planoDeContas));
+    // O filtro Status.ACTIVE acontece no repositório, então a stub retorna apenas o ACTIVE.
+    when(lancamentoRepo.findByCompanyIdAndAnoReferenciaAndStatus(
+        COMPANY_ID, FISCAL_YEAR, Status.ACTIVE))
+        .thenReturn(List.of(active));
+    when(companyTaxParameterRepository.findActiveParameterCodeByCompanyAndTypeDescription(
+        COMPANY_ID, "PERIODO_DE_APURACAO"))
+        .thenReturn(Optional.of("A"));
+    when(taxParameterRepo.findAllById(List.of(PARAMETRO_ID))).thenReturn(List.of(parametro));
+    when(planoDeContasRepo.findAllById(List.of(CONTA_CONTABIL_ID))).thenReturn(List.of(planoDeContas));
 
     String result = service.generateArquivoParcial(COMPANY_ID, FISCAL_YEAR);
 
-    assertThat(result).doesNotContain("999,00");
     assertThat(result).contains("100,00");
   }
 
   @Test
   @DisplayName("Sem lançamentos ACTIVE lança IllegalArgumentException")
   void generateArquivoParcial_semLancamentosAtivosLancaExcecao() {
-    when(lancamentoRepo.findByCompanyIdAndAnoReferencia(COMPANY_ID, FISCAL_YEAR))
+    when(lancamentoRepo.findByCompanyIdAndAnoReferenciaAndStatus(
+        COMPANY_ID, FISCAL_YEAR, Status.ACTIVE))
         .thenReturn(List.of());
 
     assertThatThrownBy(() -> service.generateArquivoParcial(COMPANY_ID, FISCAL_YEAR))
@@ -278,15 +275,16 @@ class PartMGeneratorServiceTest {
         TipoAjuste.ADICAO, BigDecimal.valueOf(100));
     LancamentoParteB lancMes3 = lancamentoIrpj(3, TipoRelacionamento.CONTA_CONTABIL,
         TipoAjuste.ADICAO, BigDecimal.valueOf(200));
-    when(taxParameterRepo.findById(PARAMETRO_ID)).thenReturn(Optional.of(parametro));
-    when(planoDeContasRepo.findById(CONTA_CONTABIL_ID)).thenReturn(Optional.of(planoDeContas));
+    when(taxParameterRepo.findAllById(List.of(PARAMETRO_ID))).thenReturn(List.of(parametro));
+    when(planoDeContasRepo.findAllById(List.of(CONTA_CONTABIL_ID))).thenReturn(List.of(planoDeContas));
 
-    List<String> lines = service.generateGrupoIrpj(List.of(lancMes1, lancMes3), FISCAL_YEAR);
+    List<String> lines = service.generateGrupoIrpj(List.of(lancMes1, lancMes3), FISCAL_YEAR, "A");
 
     long m030Count = lines.stream().filter(l -> l.startsWith("|M030|")).count();
     assertThat(m030Count).isEqualTo(2);
+    // M030 anual: período cumulativo desde 01/01 do ano fiscal
     assertThat(lines).anyMatch(l -> l.equals("|M030|01012024|31012024|A01|"));
-    assertThat(lines).anyMatch(l -> l.equals("|M030|01032024|31032024|A03|"));
+    assertThat(lines).anyMatch(l -> l.equals("|M030|01012024|31032024|A03|"));
   }
 
   @Test
