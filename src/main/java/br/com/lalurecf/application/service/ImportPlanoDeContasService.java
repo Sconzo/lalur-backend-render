@@ -44,6 +44,9 @@ public class ImportPlanoDeContasService implements ImportPlanoDeContasUseCase {
 
   private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   private static final int CHUNK_SIZE = 1000;
+  private static final String LAYOUT_HINT =
+      "Formato esperado: code;name;accountType;contaReferencialCodigo;classe;natureza;"
+          + "afetaResultado;dedutivel";
 
   private final PlanoDeContasRepositoryPort planoDeContasRepository;
   private final ContaReferencialRepositoryPort contaReferencialRepository;
@@ -259,7 +262,8 @@ public class ImportPlanoDeContasService implements ImportPlanoDeContasUseCase {
         .setIgnoreEmptyLines(true)
         .setTrim(true)
         .setHeader()
-        .setSkipHeaderRecord(true);
+        .setSkipHeaderRecord(true)
+        .setAllowMissingColumnNames(true);
 
     return new CSVParser(reader, builder.build());
   }
@@ -267,17 +271,18 @@ public class ImportPlanoDeContasService implements ImportPlanoDeContasUseCase {
   private ParsedAccountLine parseLine(CSVRecord record, int lineNumber) {
     if (record.size() < 8) {
       throw new IllegalArgumentException(
-          "Linha com menos de 8 colunas (esperado 8)");
+          "Linha " + lineNumber + ": tem " + record.size() + " coluna(s), esperado 8. "
+              + LAYOUT_HINT);
     }
     // Extrair campos por posição (header opcional)
-    String code = getRequired(record.get(0), "code", lineNumber);
-    String name = getRequired(record.get(1), "name", lineNumber);
-    String accountTypeStr = getRequired(record.get(2), "accountType", lineNumber);
+    String code = getRequired(record.get(0), "code", 1, lineNumber);
+    String name = getRequired(record.get(1), "name", 2, lineNumber);
+    String accountTypeStr = getRequired(record.get(2), "accountType", 3, lineNumber);
     String contaReferencialCodigo = normalizeField(record.get(3));
-    String classeStr = getRequired(record.get(4), "classe", lineNumber);
-    String naturezaStr = getRequired(record.get(5), "natureza", lineNumber);
-    String afetaResultadoStr = getRequired(record.get(6), "afetaResultado", lineNumber);
-    String dedutivelStr = getRequired(record.get(7), "dedutivel", lineNumber);
+    String classeStr = getRequired(record.get(4), "classe", 5, lineNumber);
+    String naturezaStr = getRequired(record.get(5), "natureza", 6, lineNumber);
+    String afetaResultadoStr = getRequired(record.get(6), "afetaResultado", 7, lineNumber);
+    String dedutivelStr = getRequired(record.get(7), "dedutivel", 8, lineNumber);
 
     // Parse enums
     AccountType accountType = parseAccountType(accountTypeStr, lineNumber);
@@ -288,8 +293,8 @@ public class ImportPlanoDeContasService implements ImportPlanoDeContasUseCase {
     int nivel = MascaraNiveisUtils.derivarNivel(code);
 
     // Parse booleans
-    Boolean afetaResultado = parseBoolean(afetaResultadoStr, "afetaResultado", lineNumber);
-    Boolean dedutivel = parseBoolean(dedutivelStr, "dedutivel", lineNumber);
+    Boolean afetaResultado = parseBoolean(afetaResultadoStr, "afetaResultado", 7, lineNumber);
+    Boolean dedutivel = parseBoolean(dedutivelStr, "dedutivel", 8, lineNumber);
 
     return new ParsedAccountLine(
         code,
@@ -307,11 +312,11 @@ public class ImportPlanoDeContasService implements ImportPlanoDeContasUseCase {
     return (value == null || value.trim().isEmpty()) ? null : value.trim();
   }
 
-  private String getRequired(String value, String fieldName, int lineNumber) {
+  private String getRequired(String value, String fieldName, int columnNumber, int lineNumber) {
     String normalized = normalizeField(value);
     if (normalized == null) {
-      throw new IllegalArgumentException(
-          "Campo '" + fieldName + "' é obrigatório (coluna vazia na linha " + lineNumber + ")");
+      throw new IllegalArgumentException(formatError(
+          lineNumber, columnNumber, fieldName, "valor obrigatório (vazio)"));
     }
     return normalized;
   }
@@ -320,11 +325,10 @@ public class ImportPlanoDeContasService implements ImportPlanoDeContasUseCase {
     try {
       return AccountType.valueOf(value.toUpperCase());
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException(
-          "Invalid accountType: '"
-              + value
-              + "'. Must be one of: "
-              + String.join(", ", getAccountTypeValues()));
+      throw new IllegalArgumentException(formatError(
+          lineNumber, 3, "accountType",
+          "valor '" + value + "' inválido. Aceitos: "
+              + String.join(", ", getAccountTypeValues())));
     }
   }
 
@@ -332,11 +336,10 @@ public class ImportPlanoDeContasService implements ImportPlanoDeContasUseCase {
     try {
       return ClasseContabil.valueOf(value.toUpperCase());
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException(
-          "Invalid classe: '"
-              + value
-              + "'. Must be one of: "
-              + String.join(", ", getClasseContabilValues()));
+      throw new IllegalArgumentException(formatError(
+          lineNumber, 5, "classe",
+          "valor '" + value + "' inválido. Aceitos: "
+              + String.join(", ", getClasseContabilValues())));
     }
   }
 
@@ -344,27 +347,29 @@ public class ImportPlanoDeContasService implements ImportPlanoDeContasUseCase {
     try {
       return NaturezaConta.valueOf(value.toUpperCase());
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException(
-          "Invalid natureza: '"
-              + value
-              + "'. Must be one of: "
-              + String.join(", ", getNaturezaContaValues()));
+      throw new IllegalArgumentException(formatError(
+          lineNumber, 6, "natureza",
+          "valor '" + value + "' inválido. Aceitos: "
+              + String.join(", ", getNaturezaContaValues())));
     }
   }
 
-  private Boolean parseBoolean(String value, String fieldName, int lineNumber) {
+  private Boolean parseBoolean(String value, String fieldName, int columnNumber, int lineNumber) {
     String normalized = value.toLowerCase().trim();
     return switch (normalized) {
       case "true", "yes", "sim", "1" -> true;
       case "false", "no", "não", "nao", "0" -> false;
       default ->
-          throw new IllegalArgumentException(
-              "Invalid "
-                  + fieldName
-                  + ": '"
-                  + value
-                  + "'. Must be true/false/yes/no/sim/não");
+          throw new IllegalArgumentException(formatError(
+              lineNumber, columnNumber, fieldName,
+              "valor '" + value + "' inválido. Aceitos: true, false, yes, no, sim, não, 1, 0"));
     };
+  }
+
+  private static String formatError(
+      int lineNumber, int columnNumber, String fieldName, String issue) {
+    return "Linha " + lineNumber + ", campo '" + fieldName + "' (coluna " + columnNumber + "): "
+        + issue + ". " + LAYOUT_HINT;
   }
 
   private List<String> getAccountTypeValues() {

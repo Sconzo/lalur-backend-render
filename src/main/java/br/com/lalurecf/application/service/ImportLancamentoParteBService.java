@@ -54,6 +54,9 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
 
   private static final long MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
   private static final int CHUNK_SIZE = 1000;
+  private static final String LAYOUT_HINT =
+      "Formato esperado: mesReferencia;tipoApuracao;tipoRelacionamento;contaContabilCode;"
+          + "contaParteBCode;parametroTributarioCodigo;tipoAjuste;descricao;valor";
 
   private final LancamentoParteBRepositoryPort lancamentoParteBRepository;
   private final PlanoDeContasRepositoryPort planoDeContasRepository;
@@ -130,26 +133,27 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
           // Extrair campos por posição (header opcional)
           if (record.size() < 9) {
             errors.add(ImportError.builder().lineNumber(lineNumber)
-                .error("Linha com menos de 9 colunas (esperado 9)").build());
+                .error("Linha " + lineNumber + ": tem " + record.size()
+                    + " coluna(s), esperado 9. " + LAYOUT_HINT).build());
             skippedLines++;
             continue;
           }
           final String mesReferenciaStr = normalizeRequired(record.get(0),
-              "mesReferencia", lineNumber);
+              "mesReferencia", 1, lineNumber);
           final String tipoApuracaoStr = normalizeRequired(record.get(1),
-              "tipoApuracao", lineNumber);
+              "tipoApuracao", 2, lineNumber);
           final String tipoRelacionamentoStr = normalizeRequired(record.get(2),
-              "tipoRelacionamento", lineNumber);
+              "tipoRelacionamento", 3, lineNumber);
           final String contaContabilCode = normalizeField(record.get(3));
           final String contaParteBCode = normalizeField(record.get(4));
           final String parametroTributarioCodigo = normalizeRequired(record.get(5),
-              "parametroTributarioCodigo", lineNumber);
+              "parametroTributarioCodigo", 6, lineNumber);
           final String tipoAjusteStr = normalizeRequired(record.get(6),
-              "tipoAjuste", lineNumber);
+              "tipoAjuste", 7, lineNumber);
           final String descricao = normalizeRequired(record.get(7),
-              "descricao", lineNumber);
+              "descricao", 8, lineNumber);
           final String valorStr = normalizeRequired(record.get(8),
-              "valor", lineNumber);
+              "valor", 9, lineNumber);
 
           // Parse mesReferencia
           int mesReferencia;
@@ -159,7 +163,9 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
               errors.add(
                   ImportError.builder()
                       .lineNumber(lineNumber)
-                      .error("mesReferencia must be between 1 and 12, got: " + mesReferenciaStr)
+                      .error(formatError(lineNumber, 1, "mesReferencia",
+                          "valor '" + mesReferenciaStr
+                              + "' fora do intervalo permitido (1 a 12)"))
                       .build());
               skippedLines++;
               continue;
@@ -168,7 +174,8 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error("Invalid mesReferencia format: " + mesReferenciaStr)
+                    .error(formatError(lineNumber, 1, "mesReferencia",
+                        "valor '" + mesReferenciaStr + "' não é um número inteiro válido"))
                     .build());
             skippedLines++;
             continue;
@@ -182,10 +189,8 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error(
-                        "Invalid tipoApuracao: '"
-                            + tipoApuracaoStr
-                            + "'. Valid values: IRPJ, CSLL")
+                    .error(formatError(lineNumber, 2, "tipoApuracao",
+                        "valor '" + tipoApuracaoStr + "' inválido. Aceitos: IRPJ, CSLL"))
                     .build());
             skippedLines++;
             continue;
@@ -199,10 +204,9 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error(
-                        "Invalid tipoRelacionamento: '"
-                            + tipoRelacionamentoStr
-                            + "'. Valid values: CONTA_CONTABIL, CONTA_PARTE_B, AMBOS")
+                    .error(formatError(lineNumber, 3, "tipoRelacionamento",
+                        "valor '" + tipoRelacionamentoStr
+                            + "' inválido. Aceitos: CONTA_CONTABIL, CONTA_PARTE_B, AMBOS"))
                     .build());
             skippedLines++;
             continue;
@@ -216,10 +220,8 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error(
-                        "Invalid tipoAjuste: '"
-                            + tipoAjusteStr
-                            + "'. Valid values: ADICAO, EXCLUSAO")
+                    .error(formatError(lineNumber, 7, "tipoAjuste",
+                        "valor '" + tipoAjusteStr + "' inválido. Aceitos: ADICAO, EXCLUSAO"))
                     .build());
             skippedLines++;
             continue;
@@ -233,7 +235,8 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
               errors.add(
                   ImportError.builder()
                       .lineNumber(lineNumber)
-                      .error("valor must be > 0")
+                      .error(formatError(lineNumber, 9, "valor",
+                          "valor '" + valorStr + "' deve ser maior que zero"))
                       .build());
               skippedLines++;
               continue;
@@ -242,7 +245,8 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error("Invalid valor format: " + valorStr)
+                    .error(formatError(lineNumber, 9, "valor",
+                        "valor '" + valorStr + "' não é um número decimal válido"))
                     .build());
             skippedLines++;
             continue;
@@ -255,10 +259,9 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error(
-                        "Parâmetro tributário não encontrado com código: '"
-                            + parametroTributarioCodigo
-                            + "'")
+                    .error(formatError(lineNumber, 6, "parametroTributarioCodigo",
+                        "código '" + parametroTributarioCodigo
+                            + "' não encontrado nos Parâmetros Tributários"))
                     .build());
             skippedLines++;
             continue;
@@ -268,11 +271,9 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error(
-                        "Parâmetro tributário '"
-                            + parametroTributarioCodigo
-                            + "' não está ACTIVE. Status: "
-                            + parametro.getStatus())
+                    .error(formatError(lineNumber, 6, "parametroTributarioCodigo",
+                        "parâmetro '" + parametroTributarioCodigo
+                            + "' está INACTIVE (status atual: " + parametro.getStatus() + ")"))
                     .build());
             skippedLines++;
             continue;
@@ -288,9 +289,8 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
                 errors.add(
                     ImportError.builder()
                         .lineNumber(lineNumber)
-                        .error(
-                            "contaContabilCode é obrigatório quando"
-                                + " tipoRelacionamento = CONTA_CONTABIL")
+                        .error(formatError(lineNumber, 4, "contaContabilCode",
+                            "valor obrigatório quando tipoRelacionamento = CONTA_CONTABIL"))
                         .build());
                 skippedLines++;
                 continue;
@@ -301,11 +301,10 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
                 errors.add(
                     ImportError.builder()
                         .lineNumber(lineNumber)
-                        .error(
-                            "Conta contábil '"
-                                + contaContabilCode
-                                + "' não encontrada para empresa/anoReferencia "
-                                + anoReferencia)
+                        .error(formatError(lineNumber, 4, "contaContabilCode",
+                            "código '" + contaContabilCode
+                                + "' não encontrado no Plano de Contas para anoReferencia "
+                                + anoReferencia))
                         .build());
                 skippedLines++;
                 continue;
@@ -318,9 +317,8 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
                 errors.add(
                     ImportError.builder()
                         .lineNumber(lineNumber)
-                        .error(
-                            "contaParteBCode é obrigatório quando"
-                                + " tipoRelacionamento = CONTA_PARTE_B")
+                        .error(formatError(lineNumber, 5, "contaParteBCode",
+                            "valor obrigatório quando tipoRelacionamento = CONTA_PARTE_B"))
                         .build());
                 skippedLines++;
                 continue;
@@ -331,11 +329,10 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
                 errors.add(
                     ImportError.builder()
                         .lineNumber(lineNumber)
-                        .error(
-                            "Conta Parte B '"
-                                + contaParteBCode
-                                + "' não encontrada para empresa/anoReferencia "
-                                + anoReferencia)
+                        .error(formatError(lineNumber, 5, "contaParteBCode",
+                            "código '" + contaParteBCode
+                                + "' não encontrado nas Contas Parte B para anoReferencia "
+                                + anoReferencia))
                         .build());
                 skippedLines++;
                 continue;
@@ -348,8 +345,8 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
                 errors.add(
                     ImportError.builder()
                         .lineNumber(lineNumber)
-                        .error(
-                            "contaContabilCode é obrigatório quando tipoRelacionamento = AMBOS")
+                        .error(formatError(lineNumber, 4, "contaContabilCode",
+                            "valor obrigatório quando tipoRelacionamento = AMBOS"))
                         .build());
                 skippedLines++;
                 continue;
@@ -358,8 +355,8 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
                 errors.add(
                     ImportError.builder()
                         .lineNumber(lineNumber)
-                        .error(
-                            "contaParteBCode é obrigatório quando tipoRelacionamento = AMBOS")
+                        .error(formatError(lineNumber, 5, "contaParteBCode",
+                            "valor obrigatório quando tipoRelacionamento = AMBOS"))
                         .build());
                 skippedLines++;
                 continue;
@@ -370,11 +367,10 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
                 errors.add(
                     ImportError.builder()
                         .lineNumber(lineNumber)
-                        .error(
-                            "Conta contábil '"
-                                + contaContabilCode
-                                + "' não encontrada para empresa/anoReferencia "
-                                + anoReferencia)
+                        .error(formatError(lineNumber, 4, "contaContabilCode",
+                            "código '" + contaContabilCode
+                                + "' não encontrado no Plano de Contas para anoReferencia "
+                                + anoReferencia))
                         .build());
                 skippedLines++;
                 continue;
@@ -385,11 +381,10 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
                 errors.add(
                     ImportError.builder()
                         .lineNumber(lineNumber)
-                        .error(
-                            "Conta Parte B '"
-                                + contaParteBCode
-                                + "' não encontrada para empresa/anoReferencia "
-                                + anoReferencia)
+                        .error(formatError(lineNumber, 5, "contaParteBCode",
+                            "código '" + contaParteBCode
+                                + "' não encontrado nas Contas Parte B para anoReferencia "
+                                + anoReferencia))
                         .build());
                 skippedLines++;
                 continue;
@@ -402,7 +397,9 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
               errors.add(
                   ImportError.builder()
                       .lineNumber(lineNumber)
-                      .error("tipoRelacionamento inválido: " + tipoRelacionamento)
+                      .error(formatError(lineNumber, 3, "tipoRelacionamento",
+                          "valor '" + tipoRelacionamento
+                              + "' inválido. Aceitos: CONTA_CONTABIL, CONTA_PARTE_B, AMBOS"))
                       .build());
               skippedLines++;
               continue;
@@ -456,7 +453,7 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
           errors.add(
               ImportError.builder()
                   .lineNumber(lineNumber)
-                  .error("Unexpected error: " + e.getMessage())
+                  .error("Linha " + lineNumber + ": erro inesperado — " + e.getMessage())
                   .build());
           skippedLines++;
         }
@@ -494,13 +491,20 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
     return (value == null || value.trim().isEmpty()) ? null : value.trim();
   }
 
-  private String normalizeRequired(String value, String fieldName, int lineNumber) {
+  private String normalizeRequired(
+      String value, String fieldName, int columnNumber, int lineNumber) {
     String normalized = normalizeField(value);
     if (normalized == null) {
-      throw new IllegalArgumentException(
-          "Campo '" + fieldName + "' é obrigatório (coluna vazia na linha " + lineNumber + ")");
+      throw new IllegalArgumentException(formatError(
+          lineNumber, columnNumber, fieldName, "valor obrigatório (vazio)"));
     }
     return normalized;
+  }
+
+  private static String formatError(
+      int lineNumber, int columnNumber, String fieldName, String issue) {
+    return "Linha " + lineNumber + ", campo '" + fieldName + "' (coluna " + columnNumber + "): "
+        + issue + ". " + LAYOUT_HINT;
   }
 
   /**
@@ -523,7 +527,8 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
         .setIgnoreEmptyLines(true)
         .setTrim(true)
         .setHeader()
-        .setSkipHeaderRecord(true);
+        .setSkipHeaderRecord(true)
+        .setAllowMissingColumnNames(true);
 
     return new CSVParser(reader, builder.build());
   }

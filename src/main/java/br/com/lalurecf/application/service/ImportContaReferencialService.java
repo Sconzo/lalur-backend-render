@@ -40,6 +40,8 @@ public class ImportContaReferencialService implements ImportContaReferencialUseC
   private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   private static final int MAX_YEAR = Year.now().getValue() + 5;
   private static final int MIN_YEAR = 2000;
+  private static final String LAYOUT_HINT =
+      "Formato esperado: codigoRfb;descricao;anoValidade (anoValidade é opcional)";
 
   private final ContaReferencialRepositoryPort contaReferencialRepository;
 
@@ -203,18 +205,21 @@ public class ImportContaReferencialService implements ImportContaReferencialUseC
         .setIgnoreEmptyLines(true)
         .setTrim(true)
         .setHeader()
-        .setSkipHeaderRecord(true);
+        .setSkipHeaderRecord(true)
+        .setAllowMissingColumnNames(true);
 
     return new CSVParser(reader, builder.build());
   }
 
   private ParsedContaReferencialLine parseLine(CSVRecord record, int lineNumber) {
     if (record.size() < 2) {
-      throw new IllegalArgumentException("Linha com menos de 2 colunas (esperado 2-3)");
+      throw new IllegalArgumentException(
+          "Linha " + lineNumber + ": tem " + record.size() + " coluna(s), esperado 2 ou 3. "
+              + LAYOUT_HINT);
     }
     // Extrair campos por posição (header opcional)
-    String codigoRfb = getRequired(record.get(0), "codigoRfb", lineNumber);
-    String descricao = getRequired(record.get(1), "descricao", lineNumber);
+    String codigoRfb = getRequired(record.get(0), "codigoRfb", 1, lineNumber);
+    String descricao = getRequired(record.get(1), "descricao", 2, lineNumber);
 
     // Campo opcional anoValidade (coluna 3)
     Integer anoValidade = null;
@@ -227,8 +232,9 @@ public class ImportContaReferencialService implements ImportContaReferencialUseC
 
     // Validar tamanho da descrição
     if (descricao.length() > 1000) {
-      throw new IllegalArgumentException(
-          "Field 'descricao' exceeds maximum length of 1000 characters");
+      throw new IllegalArgumentException(formatError(
+          lineNumber, 2, "descricao",
+          "tamanho " + descricao.length() + " excede o máximo de 1000 caracteres"));
     }
 
     return new ParsedContaReferencialLine(codigoRfb, descricao, anoValidade);
@@ -238,11 +244,11 @@ public class ImportContaReferencialService implements ImportContaReferencialUseC
     return (value == null || value.trim().isEmpty()) ? null : value.trim();
   }
 
-  private String getRequired(String value, String fieldName, int lineNumber) {
+  private String getRequired(String value, String fieldName, int columnNumber, int lineNumber) {
     String normalized = normalizeField(value);
     if (normalized == null) {
-      throw new IllegalArgumentException(
-          "Campo '" + fieldName + "' é obrigatório (coluna vazia na linha " + lineNumber + ")");
+      throw new IllegalArgumentException(formatError(
+          lineNumber, columnNumber, fieldName, "valor obrigatório (vazio)"));
     }
     return normalized;
   }
@@ -251,19 +257,23 @@ public class ImportContaReferencialService implements ImportContaReferencialUseC
     try {
       int ano = Integer.parseInt(value);
       if (ano < MIN_YEAR || ano > MAX_YEAR) {
-        throw new IllegalArgumentException(
-            "Invalid anoValidade: '"
-                + value
-                + "'. Must be between "
-                + MIN_YEAR
-                + " and "
-                + MAX_YEAR);
+        throw new IllegalArgumentException(formatError(
+            lineNumber, 3, "anoValidade",
+            "valor '" + value + "' fora do intervalo permitido ("
+                + MIN_YEAR + " a " + MAX_YEAR + ")"));
       }
       return ano;
     } catch (NumberFormatException e) {
-      throw new IllegalArgumentException(
-          "Invalid anoValidade: '" + value + "'. Must be an integer");
+      throw new IllegalArgumentException(formatError(
+          lineNumber, 3, "anoValidade",
+          "valor '" + value + "' não é um número inteiro válido"));
     }
+  }
+
+  private static String formatError(
+      int lineNumber, int columnNumber, String fieldName, String issue) {
+    return "Linha " + lineNumber + ", campo '" + fieldName + "' (coluna " + columnNumber + "): "
+        + issue + ". " + LAYOUT_HINT;
   }
 
   private String createUniqueKey(String codigoRfb, Integer anoValidade) {

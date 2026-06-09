@@ -48,6 +48,9 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
   private static final DateTimeFormatter DATE_FORMATTER_ISO = DateTimeFormatter.ISO_LOCAL_DATE;
   private static final DateTimeFormatter DATE_FORMATTER_BR =
       DateTimeFormatter.ofPattern("dd/MM/yyyy");
+  private static final String LAYOUT_HINT =
+      "Formato esperado: contaDebitoCode;contaCreditoCode;data;valor;historico;numeroDocumento"
+          + " (numeroDocumento é opcional)";
 
   private final LancamentoContabilRepositoryPort lancamentoContabilRepository;
   private final PlanoDeContasRepositoryPort planoDeContasRepository;
@@ -117,7 +120,8 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error("Linha com menos de 5 colunas (esperado 6)")
+                    .error("Linha " + lineNumber + ": tem " + record.size()
+                        + " coluna(s), esperado 5 ou 6. " + LAYOUT_HINT)
                     .build());
             skippedLines++;
             continue;
@@ -133,19 +137,22 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
           // Validar campos obrigatórios
           if (dataStr == null || dataStr.isEmpty()) {
             errors.add(ImportError.builder().lineNumber(lineNumber)
-                .error("Campo 'data' é obrigatório").build());
+                .error(formatError(lineNumber, 3, "data", "valor obrigatório (vazio)"))
+                .build());
             skippedLines++;
             continue;
           }
           if (valorStr == null || valorStr.isEmpty()) {
             errors.add(ImportError.builder().lineNumber(lineNumber)
-                .error("Campo 'valor' é obrigatório").build());
+                .error(formatError(lineNumber, 4, "valor", "valor obrigatório (vazio)"))
+                .build());
             skippedLines++;
             continue;
           }
           if (historico == null || historico.isEmpty()) {
             errors.add(ImportError.builder().lineNumber(lineNumber)
-                .error("Campo 'historico' é obrigatório").build());
+                .error(formatError(lineNumber, 5, "historico", "valor obrigatório (vazio)"))
+                .build());
             skippedLines++;
             continue;
           }
@@ -156,8 +163,10 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error(
-                        "Ao menos contaDebitoCode ou contaCreditoCode deve ser informado")
+                    .error("Linha " + lineNumber
+                        + ": ao menos um dos campos 'contaDebitoCode' (coluna 1) ou"
+                        + " 'contaCreditoCode' (coluna 2) deve estar preenchido. "
+                        + LAYOUT_HINT)
                     .build());
             skippedLines++;
             continue;
@@ -168,7 +177,10 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error("Debit and credit accounts must be different")
+                    .error("Linha " + lineNumber
+                        + ": 'contaDebitoCode' (coluna 1) e 'contaCreditoCode' (coluna 2)"
+                        + " devem ser diferentes — recebido '" + contaDebitoCode
+                        + "' em ambas")
                     .build());
             skippedLines++;
             continue;
@@ -182,7 +194,9 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
               errors.add(
                   ImportError.builder()
                       .lineNumber(lineNumber)
-                      .error("Account code '" + contaDebitoCode + "' not found for company/year")
+                      .error(formatError(lineNumber, 1, "contaDebitoCode",
+                          "código '" + contaDebitoCode
+                              + "' não encontrado no Plano de Contas da empresa/ano"))
                       .build());
               skippedLines++;
               continue;
@@ -196,7 +210,9 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
               errors.add(
                   ImportError.builder()
                       .lineNumber(lineNumber)
-                      .error("Account code '" + contaCreditoCode + "' not found for company/year")
+                      .error(formatError(lineNumber, 2, "contaCreditoCode",
+                          "código '" + contaCreditoCode
+                              + "' não encontrado no Plano de Contas da empresa/ano"))
                       .build());
               skippedLines++;
               continue;
@@ -213,8 +229,9 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error("Invalid date format. Expected YYYY-MM-DD or dd/MM/yyyy, got: "
-                        + dataStr)
+                    .error(formatError(lineNumber, 3, "data",
+                        "formato inválido '" + dataStr
+                            + "'. Aceitos: YYYY-MM-DD ou dd/MM/yyyy"))
                     .build());
             skippedLines++;
             continue;
@@ -225,11 +242,9 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error(
-                        "Data "
-                            + dataStr
-                            + " is before Período Contábil "
-                            + company.getPeriodoContabil())
+                    .error(formatError(lineNumber, 3, "data",
+                        "data " + dataStr + " é anterior ao Período Contábil da empresa ("
+                            + company.getPeriodoContabil() + ")"))
                     .build());
             skippedLines++;
             continue;
@@ -243,7 +258,8 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
               errors.add(
                   ImportError.builder()
                       .lineNumber(lineNumber)
-                      .error("Invalid value: must be > 0")
+                      .error(formatError(lineNumber, 4, "valor",
+                          "valor '" + valorStr + "' deve ser maior que zero"))
                       .build());
               skippedLines++;
               continue;
@@ -252,7 +268,8 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
             errors.add(
                 ImportError.builder()
                     .lineNumber(lineNumber)
-                    .error("Invalid value format: " + valorStr)
+                    .error(formatError(lineNumber, 4, "valor",
+                        "valor '" + valorStr + "' não é um número decimal válido"))
                     .build());
             skippedLines++;
             continue;
@@ -302,7 +319,7 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
           errors.add(
               ImportError.builder()
                   .lineNumber(lineNumber)
-                  .error("Unexpected error: " + e.getMessage())
+                  .error("Linha " + lineNumber + ": erro inesperado — " + e.getMessage())
                   .build());
           skippedLines++;
         }
@@ -342,6 +359,12 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
     return (value == null || value.trim().isEmpty()) ? null : value.trim();
   }
 
+  private static String formatError(
+      int lineNumber, int columnNumber, String fieldName, String issue) {
+    return "Linha " + lineNumber + ", campo '" + fieldName + "' (coluna " + columnNumber + "): "
+        + issue + ". " + LAYOUT_HINT;
+  }
+
   /**
    * Cria CSVParser com auto-detecção de separador e header opcional.
    */
@@ -362,7 +385,8 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
         .setIgnoreEmptyLines(true)
         .setTrim(true)
         .setHeader()
-        .setSkipHeaderRecord(true);
+        .setSkipHeaderRecord(true)
+        .setAllowMissingColumnNames(true);
 
     return new CSVParser(reader, builder.build());
   }
