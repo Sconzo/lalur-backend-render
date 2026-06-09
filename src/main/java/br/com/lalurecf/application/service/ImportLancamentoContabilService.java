@@ -48,9 +48,6 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
   private static final DateTimeFormatter DATE_FORMATTER_ISO = DateTimeFormatter.ISO_LOCAL_DATE;
   private static final DateTimeFormatter DATE_FORMATTER_BR =
       DateTimeFormatter.ofPattern("dd/MM/yyyy");
-  private static final String LAYOUT_HINT =
-      "Formato esperado: contaDebitoCode;contaCreditoCode;data;valor;historico;numeroDocumento"
-          + " (numeroDocumento é opcional)";
 
   private final LancamentoContabilRepositoryPort lancamentoContabilRepository;
   private final PlanoDeContasRepositoryPort planoDeContasRepository;
@@ -121,7 +118,7 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
                 ImportError.builder()
                     .lineNumber(lineNumber)
                     .error("Linha " + lineNumber + ": tem " + record.size()
-                        + " coluna(s), esperado 5 ou 6. " + LAYOUT_HINT)
+                        + " coluna(s), esperado 5 ou 6")
                     .build());
             skippedLines++;
             continue;
@@ -165,8 +162,7 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
                     .lineNumber(lineNumber)
                     .error("Linha " + lineNumber
                         + ": ao menos um dos campos 'contaDebitoCode' (coluna 1) ou"
-                        + " 'contaCreditoCode' (coluna 2) deve estar preenchido. "
-                        + LAYOUT_HINT)
+                        + " 'contaCreditoCode' (coluna 2) deve estar preenchido")
                     .build());
             skippedLines++;
             continue;
@@ -362,7 +358,7 @@ public class ImportLancamentoContabilService implements ImportLancamentoContabil
   private static String formatError(
       int lineNumber, int columnNumber, String fieldName, String issue) {
     return "Linha " + lineNumber + ", campo '" + fieldName + "' (coluna " + columnNumber + "): "
-        + issue + ". " + LAYOUT_HINT;
+        + issue;
   }
 
   /**

@@ -44,9 +44,6 @@ public class ImportPlanoDeContasService implements ImportPlanoDeContasUseCase {
 
   private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   private static final int CHUNK_SIZE = 1000;
-  private static final String LAYOUT_HINT =
-      "Formato esperado: code;name;accountType;contaReferencialCodigo;classe;natureza;"
-          + "afetaResultado;dedutivel";
 
   private final PlanoDeContasRepositoryPort planoDeContasRepository;
   private final ContaReferencialRepositoryPort contaReferencialRepository;
@@ -271,8 +268,7 @@ public class ImportPlanoDeContasService implements ImportPlanoDeContasUseCase {
   private ParsedAccountLine parseLine(CSVRecord record, int lineNumber) {
     if (record.size() < 8) {
       throw new IllegalArgumentException(
-          "Linha " + lineNumber + ": tem " + record.size() + " coluna(s), esperado 8. "
-              + LAYOUT_HINT);
+          "Linha " + lineNumber + ": tem " + record.size() + " coluna(s), esperado 8");
     }
     // Extrair campos por posição (header opcional)
     String code = getRequired(record.get(0), "code", 1, lineNumber);
@@ -369,7 +365,7 @@ public class ImportPlanoDeContasService implements ImportPlanoDeContasUseCase {
   private static String formatError(
       int lineNumber, int columnNumber, String fieldName, String issue) {
     return "Linha " + lineNumber + ", campo '" + fieldName + "' (coluna " + columnNumber + "): "
-        + issue + ". " + LAYOUT_HINT;
+        + issue;
   }
 
   private List<String> getAccountTypeValues() {

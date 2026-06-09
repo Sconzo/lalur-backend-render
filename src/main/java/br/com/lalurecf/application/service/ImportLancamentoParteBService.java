@@ -54,9 +54,6 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
 
   private static final long MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
   private static final int CHUNK_SIZE = 1000;
-  private static final String LAYOUT_HINT =
-      "Formato esperado: mesReferencia;tipoApuracao;tipoRelacionamento;contaContabilCode;"
-          + "contaParteBCode;parametroTributarioCodigo;tipoAjuste;descricao;valor";
 
   private final LancamentoParteBRepositoryPort lancamentoParteBRepository;
   private final PlanoDeContasRepositoryPort planoDeContasRepository;
@@ -134,7 +131,7 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
           if (record.size() < 9) {
             errors.add(ImportError.builder().lineNumber(lineNumber)
                 .error("Linha " + lineNumber + ": tem " + record.size()
-                    + " coluna(s), esperado 9. " + LAYOUT_HINT).build());
+                    + " coluna(s), esperado 9").build());
             skippedLines++;
             continue;
           }
@@ -504,7 +501,7 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
   private static String formatError(
       int lineNumber, int columnNumber, String fieldName, String issue) {
     return "Linha " + lineNumber + ", campo '" + fieldName + "' (coluna " + columnNumber + "): "
-        + issue + ". " + LAYOUT_HINT;
+        + issue;
   }
 
   /**

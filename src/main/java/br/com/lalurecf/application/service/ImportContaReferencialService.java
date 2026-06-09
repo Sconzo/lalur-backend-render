@@ -40,8 +40,6 @@ public class ImportContaReferencialService implements ImportContaReferencialUseC
   private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   private static final int MAX_YEAR = Year.now().getValue() + 5;
   private static final int MIN_YEAR = 2000;
-  private static final String LAYOUT_HINT =
-      "Formato esperado: codigoRfb;descricao;anoValidade (anoValidade é opcional)";
 
   private final ContaReferencialRepositoryPort contaReferencialRepository;
 
@@ -214,8 +212,7 @@ public class ImportContaReferencialService implements ImportContaReferencialUseC
   private ParsedContaReferencialLine parseLine(CSVRecord record, int lineNumber) {
     if (record.size() < 2) {
       throw new IllegalArgumentException(
-          "Linha " + lineNumber + ": tem " + record.size() + " coluna(s), esperado 2 ou 3. "
-              + LAYOUT_HINT);
+          "Linha " + lineNumber + ": tem " + record.size() + " coluna(s), esperado 2 ou 3");
     }
     // Extrair campos por posição (header opcional)
     String codigoRfb = getRequired(record.get(0), "codigoRfb", 1, lineNumber);
@@ -273,7 +270,7 @@ public class ImportContaReferencialService implements ImportContaReferencialUseC
   private static String formatError(
       int lineNumber, int columnNumber, String fieldName, String issue) {
     return "Linha " + lineNumber + ", campo '" + fieldName + "' (coluna " + columnNumber + "): "
-        + issue + ". " + LAYOUT_HINT;
+        + issue;
   }
 
   private String createUniqueKey(String codigoRfb, Integer anoValidade) {
