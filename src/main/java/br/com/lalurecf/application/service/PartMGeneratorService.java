@@ -46,7 +46,7 @@ public class PartMGeneratorService {
   private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("ddMMyyyy");
 
   /** Descrição do tipo de parâmetro tributário usado para determinar Anual vs Trimestral. */
-  private static final String PERIODO_DE_APURACAO_TYPE = "PERIODO_DE_APURACAO";
+  private static final String PERIODO_DE_APURACAO_TYPE = "PERIODO DE APURAÇÃO";
 
   /** Código do parâmetro PERIODO_DE_APURACAO indicando apuração anual com estimativa mensal. */
   private static final String PERIODO_ANUAL = "A";
