@@ -7,6 +7,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -60,4 +63,26 @@ public interface LancamentoParteBJpaRepository
    */
   List<LancamentoParteBEntity> findByCompanyIdAndAnoReferenciaAndMesReferencia(
       Long companyId, Integer anoReferencia, Integer mesReferencia);
+
+  /**
+   * Conta lançamentos da Parte B para uma empresa em um ano de referência (todos status).
+   *
+   * @param companyId ID da empresa
+   * @param anoReferencia ano de referência
+   * @return total de registros
+   */
+  long countByCompanyIdAndAnoReferencia(Long companyId, Integer anoReferencia);
+
+  /**
+   * Deleta (hard delete) lançamentos da Parte B de uma empresa em um ano de referência.
+   *
+   * @param companyId ID da empresa
+   * @param anoReferencia ano de referência
+   * @return quantidade de registros deletados
+   */
+  @Modifying
+  @Query("DELETE FROM LancamentoParteBEntity l "
+      + "WHERE l.company.id = :companyId AND l.anoReferencia = :anoReferencia")
+  int deleteByCompanyIdAndAnoReferencia(
+      @Param("companyId") Long companyId, @Param("anoReferencia") Integer anoReferencia);
 }

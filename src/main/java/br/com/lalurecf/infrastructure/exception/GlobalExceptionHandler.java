@@ -4,6 +4,7 @@ import br.com.lalurecf.domain.exception.BusinessRuleViolationException;
 import br.com.lalurecf.domain.exception.InvalidCredentialsException;
 import br.com.lalurecf.domain.exception.InvalidCurrentPasswordException;
 import br.com.lalurecf.domain.exception.MustChangePasswordException;
+import br.com.lalurecf.infrastructure.dto.lancamentoparteb.ImportLancamentoParteBConflictResponse;
 import jakarta.persistence.EntityNotFoundException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -157,6 +158,26 @@ public class GlobalExceptionHandler {
             .message(ex.getMessage())
             .build();
     return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+  }
+
+  /**
+   * Handler para LancamentoParteBImportConflictException — já existem lançamentos no ano.
+   *
+   * @param ex exceção lançada
+   * @return response 409 Conflict com payload detalhado para o frontend
+   */
+  @ExceptionHandler(LancamentoParteBImportConflictException.class)
+  @SuppressWarnings("checkstyle:AbbreviationAsWordInName")
+  public ResponseEntity<ImportLancamentoParteBConflictResponse>
+      handleLancamentoParteBImportConflict(LancamentoParteBImportConflictException ex) {
+    log.warn("Conflito na importação de LancamentosParteB: {}", ex.getMessage());
+    ImportLancamentoParteBConflictResponse body =
+        ImportLancamentoParteBConflictResponse.builder()
+            .existingCount(ex.getExistingCount())
+            .anoReferencia(ex.getAnoReferencia())
+            .message(ex.getMessage())
+            .build();
+    return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
   }
 
   /**

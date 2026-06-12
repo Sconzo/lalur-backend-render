@@ -91,6 +91,8 @@ public class LancamentoParteBController {
    *
    * @param file arquivo CSV/TXT (max 50MB)
    * @param dryRun se true, apenas retorna preview sem persistir (default: false)
+   * @param overwrite se true e já existirem lançamentos no ano, deleta antes de inserir
+   *     (default: false). Quando false e houver dados, retorna 409 Conflict.
    * @return relatório da importação
    */
   @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -99,17 +101,23 @@ public class LancamentoParteBController {
       summary = "Importar lançamentos Parte B via CSV",
       description =
           "Importa lançamentos da Parte B em lote via arquivo CSV/TXT. "
-              + "Requer header X-Company-Id. "
-              + "Formato: mesReferencia;anoReferencia;tipoApuracao;tipoRelacionamento;"
+              + "Requer headers X-Company-Id e X-Fiscal-Year. "
+              + "Se já existirem lançamentos no ano fiscal, retorna 409 Conflict com "
+              + "instrução para o frontend confirmar sobrescrita. Ao confirmar, refazer "
+              + "a chamada com ?overwrite=true. "
+              + "Formato: mesReferencia;tipoApuracao;tipoRelacionamento;"
               + "contaContabilCode;contaParteBCode;parametroTributarioCodigo;"
               + "tipoAjuste;descricao;valor")
   public ResponseEntity<ImportLancamentoParteBResponse> importLancamentos(
       @RequestParam("file") MultipartFile file,
-      @RequestParam(value = "dryRun", required = false, defaultValue = "false") boolean dryRun) {
+      @RequestParam(value = "dryRun", required = false, defaultValue = "false") boolean dryRun,
+      @RequestParam(value = "overwrite", required = false, defaultValue = "false")
+          boolean overwrite) {
 
     log.info(
-        "POST /api/v1/lancamento-parte-b/import - dryRun: {}, file: {}",
+        "POST /api/v1/lancamento-parte-b/import - dryRun: {}, overwrite: {}, file: {}",
         dryRun,
+        overwrite,
         file.getOriginalFilename());
 
     Long companyId = CompanyContext.getCurrentCompanyId();
@@ -119,7 +127,7 @@ public class LancamentoParteBController {
     }
 
     ImportLancamentoParteBResponse response =
-        importLancamentoParteBUseCase.importLancamentos(file, companyId, dryRun);
+        importLancamentoParteBUseCase.importLancamentos(file, companyId, dryRun, overwrite);
 
     return ResponseEntity.ok(response);
   }

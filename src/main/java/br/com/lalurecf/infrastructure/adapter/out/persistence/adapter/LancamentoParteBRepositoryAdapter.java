@@ -257,4 +257,14 @@ public class LancamentoParteBRepositoryAdapter implements LancamentoParteBReposi
   public void deleteById(Long id) {
     jpaRepository.deleteById(id);
   }
+
+  @Override
+  public long countByCompanyIdAndAnoReferencia(Long companyId, Integer anoReferencia) {
+    return jpaRepository.countByCompanyIdAndAnoReferencia(companyId, anoReferencia);
+  }
+
+  @Override
+  public int deleteByCompanyIdAndAnoReferencia(Long companyId, Integer anoReferencia) {
+    return jpaRepository.deleteByCompanyIdAndAnoReferencia(companyId, anoReferencia);
+  }
 }

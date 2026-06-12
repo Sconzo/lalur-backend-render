@@ -17,6 +17,7 @@ import br.com.lalurecf.domain.model.TaxParameter;
 import br.com.lalurecf.infrastructure.dto.lancamentoparteb.ImportLancamentoParteBResponse;
 import br.com.lalurecf.infrastructure.dto.lancamentoparteb.ImportLancamentoParteBResponse.ImportError;
 import br.com.lalurecf.infrastructure.dto.lancamentoparteb.ImportLancamentoParteBResponse.LancamentoParteBPreview;
+import br.com.lalurecf.infrastructure.exception.LancamentoParteBImportConflictException;
 import br.com.lalurecf.infrastructure.security.FiscalYearContext;
 import java.io.BufferedReader;
 import java.math.BigDecimal;
@@ -63,10 +64,13 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
   @Override
   @Transactional
   public ImportLancamentoParteBResponse importLancamentos(
-      MultipartFile file, Long companyId, boolean dryRun) {
+      MultipartFile file, Long companyId, boolean dryRun, boolean overwrite) {
 
     log.info(
-        "Starting import of LancamentosParteB for company {} (dryRun: {})", companyId, dryRun);
+        "Starting import of LancamentosParteB for company {} (dryRun: {}, overwrite: {})",
+        companyId,
+        dryRun,
+        overwrite);
 
     if (file.getSize() > MAX_FILE_SIZE) {
       throw new IllegalArgumentException(
@@ -82,6 +86,26 @@ public class ImportLancamentoParteBService implements ImportLancamentoParteBUseC
     if (anoReferencia == null) {
       throw new IllegalArgumentException(
           "Fiscal year context is required (header X-Fiscal-Year missing)");
+    }
+
+    // Detecção de conflito: se já existem lançamentos para (companyId, anoReferencia),
+    // exigir confirmação de sobrescrita (overwrite=true) ou abortar com 409.
+    // dryRun ignora a verificação porque nada é persistido.
+    if (!dryRun) {
+      long existingCount =
+          lancamentoParteBRepository.countByCompanyIdAndAnoReferencia(companyId, anoReferencia);
+      if (existingCount > 0) {
+        if (!overwrite) {
+          throw new LancamentoParteBImportConflictException(existingCount, anoReferencia);
+        }
+        int deleted =
+            lancamentoParteBRepository.deleteByCompanyIdAndAnoReferencia(companyId, anoReferencia);
+        log.info(
+            "Overwrite=true: deleted {} existing LancamentosParteB for company {} year {}",
+            deleted,
+            companyId,
+            anoReferencia);
+      }
     }
 
     // Carregar lookups de uma vez (evita N+1 queries)

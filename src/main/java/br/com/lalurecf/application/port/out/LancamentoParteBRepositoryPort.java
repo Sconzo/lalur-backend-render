@@ -108,4 +108,23 @@ public interface LancamentoParteBRepositoryPort {
    * @param id ID do lançamento
    */
   void deleteById(Long id);
+
+  /**
+   * Conta lançamentos da Parte B para uma empresa em um ano de referência.
+   *
+   * @param companyId ID da empresa
+   * @param anoReferencia ano de referência
+   * @return quantidade de lançamentos (incluindo INACTIVE)
+   */
+  long countByCompanyIdAndAnoReferencia(Long companyId, Integer anoReferencia);
+
+  /**
+   * Deleta (hard delete) todos lançamentos da Parte B para uma empresa em um ano de
+   * referência. Usado pelo fluxo de importação com sobrescrita.
+   *
+   * @param companyId ID da empresa
+   * @param anoReferencia ano de referência
+   * @return quantidade de registros deletados
+   */
+  int deleteByCompanyIdAndAnoReferencia(Long companyId, Integer anoReferencia);
 }
