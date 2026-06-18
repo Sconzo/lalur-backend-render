@@ -85,10 +85,8 @@ public class LancamentoParteBRepositoryAdapter implements LancamentoParteBReposi
                           "LancamentoParteB not found with id: " + lancamento.getId()));
       mapper.updateEntity(lancamento, entity);
     } else {
-      // Create: converte domain para nova entity
+      // Create: converte domain para nova entity e resolve company (imutável após criação)
       entity = mapper.toEntity(lancamento);
-
-      // Resolver relacionamento com Company
       CompanyEntity company =
           companyJpaRepository
               .findById(lancamento.getCompanyId())
@@ -97,46 +95,56 @@ public class LancamentoParteBRepositoryAdapter implements LancamentoParteBReposi
                       new IllegalArgumentException(
                           "Company not found with id: " + lancamento.getCompanyId()));
       entity.setCompany(company);
-
-      // Resolver relacionamento com ContaContabil (se informado)
-      if (lancamento.getContaContabilId() != null) {
-        PlanoDeContasEntity contaContabil =
-            planoDeContasJpaRepository
-                .findById(lancamento.getContaContabilId())
-                .orElseThrow(
-                    () ->
-                        new IllegalArgumentException(
-                            "ContaContabil not found with id: "
-                                + lancamento.getContaContabilId()));
-        entity.setContaContabil(contaContabil);
-      }
-
-      // Resolver relacionamento com ContaParteB (se informado)
-      if (lancamento.getContaParteBId() != null) {
-        ContaParteBEntity contaParteB =
-            contaParteBJpaRepository
-                .findById(lancamento.getContaParteBId())
-                .orElseThrow(
-                    () ->
-                        new IllegalArgumentException(
-                            "ContaParteB not found with id: " + lancamento.getContaParteBId()));
-        entity.setContaParteB(contaParteB);
-      }
-
-      // Resolver relacionamento com ParametroTributario (obrigatório)
-      TaxParameterEntity parametroTributario =
-          taxParameterJpaRepository
-              .findById(lancamento.getParametroTributarioId())
-              .orElseThrow(
-                  () ->
-                      new IllegalArgumentException(
-                          "ParametroTributario not found with id: "
-                              + lancamento.getParametroTributarioId()));
-      entity.setParametroTributario(parametroTributario);
     }
+
+    // FKs editáveis: resolver tanto no create quanto no update. O mapper ignora estas
+    // referências propositalmente — a sincronização das associações @ManyToOne fica
+    // sempre por conta do adapter, garantindo que mudanças em parametroTributarioId,
+    // contaContabilId e contaParteBId via UPDATE sejam aplicadas.
+    resolveEditableForeignKeys(entity, lancamento);
 
     LancamentoParteBEntity savedEntity = jpaRepository.save(entity);
     return mapper.toDomain(savedEntity);
+  }
+
+  private void resolveEditableForeignKeys(
+      LancamentoParteBEntity entity, LancamentoParteB lancamento) {
+
+    if (lancamento.getContaContabilId() != null) {
+      PlanoDeContasEntity contaContabil =
+          planoDeContasJpaRepository
+              .findById(lancamento.getContaContabilId())
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          "ContaContabil not found with id: " + lancamento.getContaContabilId()));
+      entity.setContaContabil(contaContabil);
+    } else {
+      entity.setContaContabil(null);
+    }
+
+    if (lancamento.getContaParteBId() != null) {
+      ContaParteBEntity contaParteB =
+          contaParteBJpaRepository
+              .findById(lancamento.getContaParteBId())
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          "ContaParteB not found with id: " + lancamento.getContaParteBId()));
+      entity.setContaParteB(contaParteB);
+    } else {
+      entity.setContaParteB(null);
+    }
+
+    TaxParameterEntity parametroTributario =
+        taxParameterJpaRepository
+            .findById(lancamento.getParametroTributarioId())
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        "ParametroTributario not found with id: "
+                            + lancamento.getParametroTributarioId()));
+    entity.setParametroTributario(parametroTributario);
   }
 
   @Override
